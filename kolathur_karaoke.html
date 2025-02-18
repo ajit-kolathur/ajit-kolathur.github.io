@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Template Generator</title>
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.css">
+    <style>
+        form {
+            max-width: 600px;
+            margin: auto;
+        }
+        textarea {
+            width: 100%;
+            margin-top: 1em;
+        }
+        button {
+            margin-top: 1em;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Kolathur Karaoke Template Generator</h1>
+    </header>
+    <main>
+        <form id="templateForm">
+            <label for="poster">Poster Image URL:</label>
+            <input type="url" id="poster" name="poster" required>
+
+            <label for="singerImages">Singer Images:</label>
+            <select id="singerImages" name="singerImages" multiple required>
+                <option value="ravi">Ravi</option>
+                <option value="sujata">Sujata</option>
+                <option value="usha">Usha</option>
+            </select>
+
+            <label for="song">Song Name:</label>
+            <input type="text" id="song" name="song" required>
+
+            <label for="additionalInfo">Additional Info [Add one one line per item]:</label>
+            <label for="additionalInfo">Ex: Film, Singers (Karaoke), Whistler (Karaoke), Singers (Original)</label>
+            <textarea id="additionalInfo" name="additionalInfo" rows="6" placeholder="Enter additional details..."></textarea>
+
+            <button type="button" onclick="generateTemplate()">Generate Template</button>
+        </form>
+
+        <section>
+            <h2>Generated Template:</h2>
+            <textarea id="output" rows="10" readonly></textarea>
+            <button onclick="downloadTemplate()">Download Template</button>
+        </section>
+    </main>
+
+    <script>
+        function getRandomImages(singer) {
+            const imageSets = {
+                'ravi': ['ravi_1', 'ravi_2', 'ravi_3', 'ravi_4', 'ravi_5', 'ravi_6', 'ravi_7', 'ravi_8', 'ravi_9', 'ravi_10', 'ravi_11', 'ravi_12'],
+                'sujata': ['sujata_1', 'sujata_2', 'sujata_3', 'sujata_4'],
+                'usha': ['usha_1', 'usha_2', 'usha_3']
+            };
+            const images = imageSets[singer] || [];
+            return images.sort(() => 0.5 - Math.random()).slice(0, 3);
+        }
+
+        function generateTemplate() {
+            const poster = document.getElementById('poster').value;
+            const selectedSingers = Array.from(document.getElementById('singerImages').selectedOptions).map(option => option.value);
+            const selectedImages = selectedSingers.flatMap(getRandomImages).join(', ');
+            const song = document.getElementById('song').value;
+            const additionalInfo = document.getElementById('additionalInfo').value;
+
+            const template = `Poster Image: ${poster}\nSingers Images: ${selectedImages}\nSong: ${song}\n${additionalInfo}`;
+            
+            document.getElementById('output').value = template;
+        }
+
+        function downloadTemplate() {
+            const songName = document.getElementById('song').value.trim();
+            if (!songName) {
+                alert('Please enter a song name');
+                return;
+            }
+            const text = document.getElementById('output').value;
+            const blob = new Blob([text], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${songName}.txt`;
+            a.click();
+        }
+    </script>
+</body>
+</html>
