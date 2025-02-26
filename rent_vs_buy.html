@@ -42,12 +42,16 @@
     <input type="range" id="rentCostRange" min="0" max="5000" value="1500" step="50">
     
     <label for="rentIncrease">Annual Rent Increase (%):</label>
-    <input type="number" id="rentIncrease" min="0" max="100" value="3">
+    <input type="number" id="rentIncrease" min="0" max="100" value="3" step="0.1">
     <input type="range" id="rentIncreaseRange" min="0" max="100" value="3" step="0.1">
     
     <label for="stockReturn">Stock Market Return (% per year):</label>
-    <input type="number" id="stockReturn" min="0" max="100" value="7">
+    <input type="number" id="stockReturn" min="0" max="100" value="7" step="0.1">
     <input type="range" id="stockReturnRange" min="0" max="100" value="7" step="0.1">
+    
+    <label for="propertyGrowth">Property Value Growth Rate (% per year):</label>
+    <input type="number" id="propertyGrowth" min="0" max="100" value="3" step="0.1">
+    <input type="range" id="propertyGrowthRange" min="0" max="100" value="3" step="0.1">
     
     <label for="yearsLater">Years Later (<= Loan Term):</label>
     <input type="number" id="yearsLater" min="0" max="30" value="10">
@@ -73,8 +77,12 @@
       \( L(T) = L \cdot \frac{(1+i)^n - (1+i)^{12T}}{(1+i)^n - 1} \).
     </p>
     <p>
-      Thus, the <strong>Buying Net Equity</strong> is:
-      \( E_{buy} = P - L(T) \).
+      The <strong>Future Property Value</strong> after \( T \) years is:
+      \( P_T = P\,(1+g)^T \), where \( g \) is the annual property growth rate.
+    </p>
+    <p>
+      Thus, if you sell the property after \( T \) years, your <strong>Buying Net Equity</strong> is:
+      \( E_{buy} = P\,(1+g)^T - L(T) \).
     </p>
     <p>
       For <strong>Renting</strong>, the initial down payment \( D = P \cdot d \) is invested, and for each month the extra available cash  
@@ -136,6 +144,7 @@
       const rent = parseFloat(document.getElementById("rentCost").value);
       const rentIncrease = parseFloat(document.getElementById("rentIncrease").value);
       const stockReturn = parseFloat(document.getElementById("stockReturn").value);
+      const propertyGrowth = parseFloat(document.getElementById("propertyGrowth").value);
       let yearsLater = parseFloat(document.getElementById("yearsLater").value);
       
       // Ensure yearsLater does not exceed the loan term
@@ -147,7 +156,12 @@
       
       const M = calculateMortgagePayment(P, downPaymentPercent, annualRate, loanTermYears);
       const remaining = calculateRemainingBalance(P, downPaymentPercent, annualRate, loanTermYears, yearsLater);
-      const buyEquity = P - remaining;
+      
+      // Calculate future property value based on growth rate
+      const futureHousePrice = P * Math.pow(1 + propertyGrowth / 100, yearsLater);
+      
+      // Buying net equity: property value minus remaining loan balance
+      const buyEquity = futureHousePrice - remaining;
       
       // For renting: invest the down payment and the dynamic monthly extra contributions based on rent increase
       const D = P * (downPaymentPercent / 100);
@@ -183,6 +197,7 @@
       ["rentCost", "rentCostRange"],
       ["rentIncrease", "rentIncreaseRange"],
       ["stockReturn", "stockReturnRange"],
+      ["propertyGrowth", "propertyGrowthRange"],
       ["yearsLater", "yearsLaterRange"]
     ];
     
