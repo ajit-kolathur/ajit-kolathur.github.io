@@ -41,6 +41,10 @@
     <input type="number" id="rentCost" min="0" max="5000" value="1500">
     <input type="range" id="rentCostRange" min="0" max="5000" value="1500" step="50">
     
+    <label for="rentIncrease">Annual Rent Increase (%):</label>
+    <input type="number" id="rentIncrease" min="0" max="100" value="3">
+    <input type="range" id="rentIncreaseRange" min="0" max="100" value="3" step="0.1">
+    
     <label for="stockReturn">Stock Market Return (% per year):</label>
     <input type="number" id="stockReturn" min="0" max="100" value="7">
     <input type="range" id="stockReturnRange" min="0" max="100" value="7" step="0.1">
@@ -62,7 +66,7 @@
     <p>
       The <strong>Mortgage Payment</strong> is calculated as: 
       \( M = \frac{L \cdot i (1+i)^n}{(1+i)^n - 1} \), where 
-      \( L = P (1-d) \) is the loan amount, \( i = \frac{r}{12} \) is the monthly interest rate (with \( r \) as the annual rate), and \( n = 12 \times \text{Loan Term} \).
+      \( L = P (1-d) \) is the loan amount, where \( d \) is the down payment fraction, \( i = \frac{r}{12} \) is the monthly interest rate (with \( r \) as the annual rate), and \( n = 12 \times \text{Loan Term} \).
     </p>
     <p>
       The <strong>Remaining Balance</strong> after \( T \) years is:
@@ -73,10 +77,11 @@
       \( E_{buy} = P - L(T) \).
     </p>
     <p>
-      For <strong>Renting</strong>, the initial down payment \( D = P \cdot d \) is invested, and if the total monthly cost of buying (mortgage payment plus HOA) exceeds the rent \( R \), the difference  
-      \( C = \max(M + \mathrm{HOA} - R,\,0) \) is also invested monthly. With monthly compounding, the future value after \( T \) years is:
+      For <strong>Renting</strong>, the initial down payment \( D = P \cdot d \) is invested, and for each month the extra available cash  
+      \( C_m = \max\bigl((M + \mathrm{HOA}) - R_m,\,0\bigr) \) is invested, where the current monthly rent increases as  
+      \( R_m = R_0\,(1+r_{rent})^{\lfloor m/12 \rfloor} \). The future value after \( T \) years is:
       \[
-      FV = D\,(1+\tfrac{r_{stock}}{12})^{12T} + C\,\frac{(1+\tfrac{r_{stock}}{12})^{12T}-1}{\tfrac{r_{stock}}{12}}\,.
+      FV = D\,(1+\tfrac{r_{stock}}{12})^{12T} + \sum_{m=0}^{12T-1} C_m\,(1+\tfrac{r_{stock}}{12})^{12T-m}\,.
       \]
     </p>
     <p>
@@ -106,14 +111,20 @@
       return L * (Math.pow(1 + monthlyRate, n) - Math.pow(1 + monthlyRate, m)) / (Math.pow(1 + monthlyRate, n) - 1);
     }
     
-    // Future value with monthly compounding
-    function futureValue(D, monthlyContribution, annualReturn, years) {
+    // Future value for renting scenario with annual rent increase simulation
+    function futureValueRent(D, annualReturn, years, M, hoa, initialRent, rentIncrease) {
       const monthlyRate = annualReturn / 1200;
-      const months = years * 12;
-      if (monthlyRate === 0) {
-        return D + monthlyContribution * months;
+      const totalMonths = years * 12;
+      let totalFV = D * Math.pow(1 + monthlyRate, totalMonths);
+      for (let m = 0; m < totalMonths; m++) {
+        // Calculate current month's rent with annual increase
+        let yearIndex = Math.floor(m / 12);
+        let currentRent = initialRent * Math.pow(1 + rentIncrease / 100, yearIndex);
+        let extra = Math.max((M + hoa) - currentRent, 0);
+        let monthsToGrow = totalMonths - m;
+        totalFV += extra * Math.pow(1 + monthlyRate, monthsToGrow);
       }
-      return D * Math.pow(1 + monthlyRate, months) + monthlyContribution * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate);
+      return totalFV;
     }
     
     function updateCalculation() {
@@ -123,11 +134,13 @@
       const loanTermYears = parseFloat(document.getElementById("loanTerm").value);
       const hoa = parseFloat(document.getElementById("hoaCost").value);
       const rent = parseFloat(document.getElementById("rentCost").value);
+      const rentIncrease = parseFloat(document.getElementById("rentIncrease").value);
       const stockReturn = parseFloat(document.getElementById("stockReturn").value);
-      const yearsLater = parseFloat(document.getElementById("yearsLater").value);
+      let yearsLater = parseFloat(document.getElementById("yearsLater").value);
       
       // Ensure yearsLater does not exceed the loan term
       if (yearsLater > loanTermYears) {
+        yearsLater = loanTermYears;
         document.getElementById("yearsLater").value = loanTermYears;
         document.getElementById("yearsLaterRange").value = loanTermYears;
       }
@@ -136,10 +149,9 @@
       const remaining = calculateRemainingBalance(P, downPaymentPercent, annualRate, loanTermYears, yearsLater);
       const buyEquity = P - remaining;
       
-      // For renting: invest the down payment and, if applicable, the monthly difference
+      // For renting: invest the down payment and the dynamic monthly extra contributions based on rent increase
       const D = P * (downPaymentPercent / 100);
-      const extraMonthly = Math.max((M + hoa) - rent, 0);
-      const rentFV = futureValue(D, extraMonthly, stockReturn, yearsLater);
+      const rentFV = futureValueRent(D, stockReturn, yearsLater, M, hoa, rent, rentIncrease);
       
       const netDifference = buyEquity - rentFV;
       
@@ -169,6 +181,7 @@
       ["loanTerm", "loanTermRange"],
       ["hoaCost", "hoaCostRange"],
       ["rentCost", "rentCostRange"],
+      ["rentIncrease", "rentIncreaseRange"],
       ["stockReturn", "stockReturnRange"],
       ["yearsLater", "yearsLaterRange"]
     ];
