@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NIV Issuance Trends</title>
+  <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+  <script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>
+  <script src="https://unpkg.com/fflate/umd/index.js"></script>
+  <style>
+    .chart-container {
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>NIV Issuance Trends</h1>
+  </header>
+
+  <main>
+    <section>
+      <p>
+        This dashboard visualizes monthly Non-Immigrant Visa (NIV) issuance data
+        <strong>by Nationality</strong> and <strong>by Post</strong>. Use the filters below to explore trends.
+      </p>
+      <p>
+        Data is sourced from the 
+        <a href="https://travel.state.gov/content/travel/en/legal/visa-law0/visa-statistics/nonimmigrant-visa-statistics/monthly-nonimmigrant-visa-issuances.html" target="_blank">
+          U.S. Department of State – Visa Statistics
+        </a>.
+      </p>
+      <p>
+        GitHub repository: 
+        <a href="https://github.com/ajit-kolathur/ajit-kolathur.github.io/visa_statistics" target="_blank">
+          ajit-kolathur/visa_statistics
+        </a>
+      </p>
+
+      <label for="visa-filter"><strong>Visa Type:</strong></label>
+      <select id="visa-filter"></select>
+
+      <label for="nationality-filter"><strong>Nationality:</strong></label>
+      <select id="nationality-filter">
+        <option value="ALL">All</option>
+      </select>
+
+      <label for="post-filter"><strong>Post:</strong></label>
+      <select id="post-filter">
+        <option value="ALL">All</option>
+      </select>
+    </section>
+
+    <section>
+      <h2>By Nationality</h2>
+      <div id="nationality-chart" class="chart-container"></div>
+    </section>
+
+    <section>
+      <h2>By Post</h2>
+      <div id="post-chart" class="chart-container"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Source: Monthly NIV Issuance Reports</p>
+  </footer>
+
+  <script>
+    let nationalityData = [];
+    let postData = [];
+    
+    async function loadGzippedJSON(filePath) {
+      const res = await fetch(filePath);
+      const buffer = await res.arrayBuffer();
+      const decompressed = fflate.decompressSync(new Uint8Array(buffer));
+      const text = new TextDecoder("utf-8").decode(decompressed);
+      return JSON.parse(text);
+    }
+
+    function getUniqueValues(data, key) {
+      return [...new Set(data.map(row => row[key]).filter(Boolean))].sort();
+    }
+
+    function populateDropdown(id, values, includeAll = false) {
+      const dropdown = document.getElementById(id);
+      dropdown.innerHTML = "";
+      if (includeAll) {
+        const allOpt = document.createElement("option");
+        allOpt.value = "ALL";
+        allOpt.textContent = "All";
+        dropdown.appendChild(allOpt);
+      }
+      values.forEach(val => {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = val;
+        dropdown.appendChild(opt);
+      });
+    }
+
+    function processData(data, groupKey, filters) {
+      const grouped = {};
+
+      data.forEach(entry => {
+        if (filters.visa && entry["Visa Class"] !== filters.visa) return;
+        if (filters.nationality && groupKey === "Nationality" && filters.nationality !== "ALL" && entry["Nationality"] !== filters.nationality) return;
+        if (filters.post && groupKey === "Post" && filters.post !== "ALL" && entry["Post"] !== filters.post) return;
+
+        const groupValue = entry[groupKey];
+        if (!groupValue || !entry.Date) return;
+
+        const date = entry.Date;
+        const count = parseInt(entry.Issuances) || 0;
+
+        if (!grouped[groupValue]) grouped[groupValue] = {};
+        grouped[groupValue][date] = (grouped[groupValue][date] || 0) + count;
+      });
+
+      return Object.entries(grouped).map(([name, values]) => {
+        const dates = Object.keys(values).sort();
+        const y = dates.map(date => values[date]);
+        return {
+          x: dates,
+          y: y,
+          name: name,
+          mode: 'lines+markers',
+          type: 'scatter'
+        };
+      });
+    }
+
+    function renderChart(traces, chartId, title) {
+      const layout = {
+        title: title,
+        xaxis: { title: "Date", type: "date" },
+        yaxis: { title: "Issuances" },
+        legend: { orientation: "h", x: 0, y: -0.3 },
+        margin: { t: 40, b: 80 }
+      };
+      Plotly.newPlot(chartId, traces, layout, { responsive: true });
+    }
+
+    function updateCharts() {
+      const visaType = document.getElementById("visa-filter").value;
+      const nationalityFilter = document.getElementById("nationality-filter").value;
+      const postFilter = document.getElementById("post-filter").value;
+
+      const filters = {
+        visa: visaType,
+        nationality: nationalityFilter,
+        post: postFilter
+      };
+
+      const nationalityTraces = processData(nationalityData, "Nationality", filters);
+      const postTraces = processData(postData, "Post", filters);
+
+      renderChart(nationalityTraces, "nationality-chart", `Issuances by Nationality`);
+      renderChart(postTraces, "post-chart", `Issuances by Post`);
+    }
+
+    async function init() {
+      nationalityData = await loadGzippedJSON("combined_nationality_data.json.gz");
+      postData = await loadGzippedJSON("combined_post_data.json.gz");
+
+      // Get unique filter options
+      const visaTypes = getUniqueValues([...nationalityData, ...postData], "Visa Class");
+      const nationalities = getUniqueValues(nationalityData, "Nationality");
+      const posts = getUniqueValues(postData, "Post");
+
+      // Populate dropdowns
+      populateDropdown("visa-filter", visaTypes);
+      populateDropdown("nationality-filter", nationalities, true);
+      populateDropdown("post-filter", posts, true);
+
+      // Add event listeners
+      document.getElementById("visa-filter").addEventListener("change", updateCharts);
+      document.getElementById("nationality-filter").addEventListener("change", updateCharts);
+      document.getElementById("post-filter").addEventListener("change", updateCharts);
+
+      // Initial render
+      updateCharts();
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
