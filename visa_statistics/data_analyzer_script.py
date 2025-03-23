@@ -78,13 +78,22 @@ combined_post_df['Date'] = pd.to_datetime(
     combined_post_df[['Year', 'Month']].assign(DAY=1)
 ).dt.strftime('%Y-%m-%d')
 
+combined_nationality_df = combined_nationality_df.fillna({
+    col: "" if combined_nationality_df[col].dtype == "object" else 0
+    for col in combined_nationality_df.columns
+})
+
+combined_post_df = combined_post_df.fillna({
+    col: "" if combined_post_df[col].dtype == "object" else 0
+    for col in combined_post_df.columns
+})
 
 
 # Export combined DataFrames to JSON files
 # Write compressed JSON to .json.gz file
 def save_as_gzipped_json(df, filename):
     with gzip.open(filename, 'wt', encoding='utf-8') as f:
-        json.dump(df.to_dict(orient="records"), f, indent=4)
+        f.write(df.to_json(orient="records", indent=4))
 
 # Assuming you've already created these DataFrames:
 # combined_nationality_df and combined_post_df
